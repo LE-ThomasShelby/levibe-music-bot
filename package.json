@@ -4,7 +4,7 @@
   "private": true,
   "description": "LEVIBE — Feel the Beat. Own the Vibe.",
   "main": "src/index.js",
-  "scripts": { "start": "node src/index.js", "check": "node --check src/index.js && node --check src/player.js && node --check src/lavalink.js" },
+  "scripts": { "start": "node src/index.js", "check": "node --check src/index.js && node --check src/player.js" },
   "engines": { "node": ">=20" },
-  "dependencies": { "discord.js": "^14.19.3", "dotenv": "^16.4.7", "ws": "^8.18.0" }
+  "dependencies": { "discord.js": "^14.19.3", "dotenv": "^16.4.7", "shoukaku": "^4.1.1" }
 }
