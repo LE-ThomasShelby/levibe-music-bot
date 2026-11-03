@@ -40,7 +40,7 @@ client.on("messageCreate", async message => {
     if (command === "play") {
       if (!input) return message.reply("Give me a song name or supported audio URL.");
       if (!message.member.voice.channel) return message.reply("Join a voice channel first.");
-      const identifier = /^https?:\/\//i.test(input) ? input : "ytsearch:" + input;
+      const identifier = /^https?:\/\//i.test(input) ? input : "scsearch:" + input;
       const result = await players.play(message, identifier);
       return message.reply({ embeds: [makeEmbed("Added to the vibe", "**" + result.track.info.title + "**\nQueue position: **" + result.position + "**")] });
     }
