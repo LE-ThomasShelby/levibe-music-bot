@@ -21,13 +21,13 @@ Users must join a voice channel before requesting music. The bot needs **View Ch
 - A Discord application/bot token
 - A reachable Lavalink v4 server and a compatible, legally permitted audio-source plugin
 
-Copy `.env.example` to `.env` and fill in the values. Then run `npm install` and `npm start`.
+Copy `.env.example` to `.env`, fill in the values, then run `npm install` and `npm start`.
 
 ## Important setup notes
 
-This repository is a starter, not a hosted or production-ready service. It does not include a Lavalink server, hosting, persistent queues, dashboards, or 24/7 uptime. The bot cannot play audio until Lavalink is separately installed, configured, reachable, and loaded with a compatible source plugin. YouTube and other sources can change their access rules; use only supported, permitted integrations and do not bypass restrictions.
+This repository is a starter, not a hosted or production-ready service. It does not include a Lavalink server, hosting, persistent queues, dashboards, or guaranteed 24/7 uptime. Playback will not work until Lavalink is separately installed, configured, reachable, and loaded with a compatible source plugin. YouTube and other source integrations can change; use only supported, permitted integrations and do not bypass access restrictions.
 
-The queues are isolated by Discord server but stored in memory, so they reset if the bot restarts. For a public multi-server deployment, add reconnect handling, robust voice-state synchronization, rate limits, monitoring, tests, and a reliable host before inviting large numbers of servers.
+The bot uses Shoukaku to handle Lavalink voice connections. Queues are isolated by Discord server but stored in memory, so they reset if the bot restarts. Before a large public deployment, add monitoring, automated tests, persistent settings, operational alerts, and verify reconnection behavior under your hosting setup.
 
 ## Branding
 
