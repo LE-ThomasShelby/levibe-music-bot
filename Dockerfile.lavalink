@@ -1,0 +1,4 @@
+FROM ghcr.io/lavalink-devs/lavalink:4
+COPY northflank/application.yml /opt/Lavalink/application.yml
+ENV _JAVA_OPTIONS="-Xms256M -Xmx768M"
+EXPOSE 2333/tcp
