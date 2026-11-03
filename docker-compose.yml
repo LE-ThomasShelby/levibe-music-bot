@@ -4,7 +4,8 @@ services:
     container_name: levibe-lavalink
     restart: unless-stopped
     environment:
-      - _JAVA_OPTIONS=-Xmx512M
+      _JAVA_OPTIONS: -Xmx512M
+      LAVALINK_PASSWORD: ${LAVALINK_PASSWORD:-youshallnotpass}
     volumes:
       - ./application.example.yml:/opt/Lavalink/application.yml:ro
     ports:
