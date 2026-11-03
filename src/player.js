@@ -1,98 +1,81 @@
 class PlayerManager {
-  constructor(client, lavalink) {
+  constructor(client, shoukaku) {
     this.client = client;
-    this.lavalink = lavalink;
+    this.shoukaku = shoukaku;
     this.players = new Map();
-    lavalink.on("event", event => this.onEvent(event));
   }
   get(guildId) { return this.players.get(guildId); }
-  async create(message) {
+  async getOrCreate(message) {
     const guildId = message.guild.id;
     const existing = this.get(guildId);
-    if (existing) return existing;
+    if (existing) {
+      if (existing.voiceChannelId !== message.member.voice.channel?.id) {
+        throw new Error("Join the voice channel where LEVIBE is already playing.");
+      }
+      return existing;
+    }
     const voice = message.member.voice.channel;
     if (!voice) throw new Error("Join a voice channel first.");
     const me = message.guild.members.me;
     const permissions = voice.permissionsFor(me);
     if (!permissions?.has(["Connect", "Speak"])) throw new Error("I need Connect and Speak permissions in that voice channel.");
-    const player = {
-      guildId, textChannelId: message.channel.id, voiceChannelId: voice.id,
-      queue: [], current: null, volume: 80, paused: false
-    };
-    this.players.set(guildId, player);
-    try {
-      await this.lavalink.updatePlayer(guildId, {
-        voice: { token: message.guild.voiceAdapterCreator ? undefined : undefined }
-      });
-    } catch (error) {
+    const player = await this.shoukaku.joinVoiceChannel({
+      guildId, channelId: voice.id, shardId: message.guild.shardId,
+      deafened: true, muted: false
+    });
+    const state = { guildId, voiceChannelId: voice.id, textChannelId: message.channel.id, player, queue: [], current: null, volume: 80 };
+    this.players.set(guildId, state);
+    player.on("end", async event => {
+      if (event.reason === "replaced") return;
+      await this.startNext(state).catch(error => this.report(state, error));
+    });
+    player.on("exception", event => this.report(state, new Error(event.exception?.message || "Playback exception.")));
+    player.on("closed", () => {
       this.players.delete(guildId);
-      throw error;
-    }
-    return player;
-  }
-  async connect(message, player) {
-    const voice = message.member.voice.channel;
-    const connection = await message.guild.voiceAdapterCreator;
-    void connection;
-    await message.guild.members.me.voice.setChannel(voice);
-    player.voiceChannelId = voice.id;
+    });
+    return state;
   }
   async play(message, identifier) {
-    const player = this.get(message.guild.id) || await this.create(message);
-    if (player.voiceChannelId !== message.member.voice.channel?.id) throw new Error("Join my current voice channel to control this queue.");
-    const result = await this.lavalink.loadTracks(identifier);
-    const tracks = result.tracks || [];
-    if (!tracks.length) throw new Error("No playable tracks found. Check the Lavalink source plugin and try another search.");
+    const state = await this.getOrCreate(message);
+    const node = this.shoukaku.getNode();
+    const result = await node.rest.resolve(identifier);
+    const tracks = result?.tracks || [];
+    if (!tracks.length) throw new Error("No playable tracks found. Check your Lavalink source plugin.");
     const track = tracks[0];
-    player.queue.push(track);
-    if (!player.current) await this.startNext(player);
-    return { track, position: player.queue.length };
+    state.queue.push(track);
+    const position = state.queue.length + (state.current ? 1 : 0);
+    if (!state.current) await this.startNext(state);
+    return { track, position };
   }
-  async startNext(player) {
-    player.current = player.queue.shift() || null;
-    if (!player.current) {
-      await this.lavalink.destroyPlayer(player.guildId).catch(() => {});
-      this.players.delete(player.guildId);
+  async startNext(state) {
+    state.current = state.queue.shift() || null;
+    if (!state.current) {
+      this.players.delete(state.guildId);
+      await state.player.destroy();
       return;
     }
-    await this.lavalink.updatePlayer(player.guildId, {
-      track: { encoded: player.current.encoded },
-      volume: player.volume,
-      paused: false
-    });
-    player.paused = false;
-  }
-  async onEvent(event) {
-    const player = this.get(event.guildId);
-    if (!player) return;
-    if (event.type === "TrackEndEvent" && ["finished", "loadFailed", "cleanup"].includes(event.reason)) {
-      await this.startNext(player).catch(error => this.emitError(player, error));
-    }
-    if (event.type === "WebSocketClosedEvent") this.emitError(player, new Error("Voice connection closed."));
+    await state.player.playTrack({ track: { encoded: state.current.encoded } });
   }
   async skip(guildId) {
-    const player = this.get(guildId);
-    if (!player?.current) throw new Error("Nothing is playing.");
-    await this.lavalink.updatePlayer(guildId, { track: { encoded: null } });
-    await this.startNext(player);
+    const state = this.get(guildId);
+    if (!state?.current) throw new Error("Nothing is playing.");
+    await state.player.stopTrack();
   }
   async pause(guildId, paused) {
-    const player = this.get(guildId);
-    if (!player?.current) throw new Error("Nothing is playing.");
-    await this.lavalink.updatePlayer(guildId, { paused });
-    player.paused = paused;
+    const state = this.get(guildId);
+    if (!state?.current) throw new Error("Nothing is playing.");
+    await state.player.setPaused(paused);
   }
   async stop(guildId) {
-    const player = this.get(guildId);
-    if (!player) throw new Error("Nothing is playing.");
-    player.queue = [];
-    player.current = null;
-    await this.lavalink.destroyPlayer(guildId);
+    const state = this.get(guildId);
+    if (!state) throw new Error("Nothing is playing.");
+    state.queue = [];
+    state.current = null;
     this.players.delete(guildId);
+    await state.player.destroy();
   }
-  emitError(player, error) {
-    const channel = this.client.channels.cache.get(player.textChannelId);
-    channel?.send({ content: `LEVIBE • ${error.message}` }).catch(() => {});
+  report(state, error) {
+    this.client.channels.cache.get(state.textChannelId)?.send("LEVIBE • " + error.message).catch(() => {});
   }
 }
 module.exports = PlayerManager;
